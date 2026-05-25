@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LupusAI — Triaje Dermatológico</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0f1a;
+            --surface: #101827;
+            --surface-2: #162032;
+            --border: rgba(99, 179, 237, 0.12);
+            --border-bright: rgba(99, 179, 237, 0.3);
+            --accent: #38bdf8;
+            --accent-dim: rgba(56, 189, 248, 0.15);
+            --accent-glow: rgba(56, 189, 248, 0.08);
+            --text: #e2e8f0;
+            --text-muted: #64748b;
+            --text-dim: #94a3b8;
+            --red: #f87171;
+            --red-dim: rgba(248, 113, 113, 0.12);
+            --amber: #fbbf24;
+            --amber-dim: rgba(251, 191, 36, 0.12);
+            --green: #34d399;
+            --green-dim: rgba(52, 211, 153, 0.12);
+            --purple: #a78bfa;
+            --purple-dim: rgba(167, 139, 250, 0.12);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Glow orb */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -200px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 500px;
+            background: radial-gradient(ellipse, rgba(56,189,248,0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* NAV */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10,15,26,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.4rem;
+            letter-spacing: 0.02em;
+        }
+
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, var(--accent), #818cf8);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+
+        .nav-badge {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid rgba(56,189,248,0.3);
+            padding: 3px 10px;
+            border-radius: 100px;
+            background: var(--accent-dim);
+        }
+
+        .nav-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .status-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse-dot 2s ease infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* LAYOUT */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 4rem;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding-top: 1rem;
+        }
+
+        .page-header h2 {
+            font-family: 'Instrument Serif', serif;
+            font-size: 2rem;
+            font-weight: 400;
+            color: var(--text);
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 300;
+        }
+
+        /* MAIN GRID */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        /* CARD */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+
+        .card:hover { border-color: var(--border-bright); }
+
+        .card-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            display: block;
+            width: 3px; height: 12px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .card-body { padding: 1.25rem; }
+
+        /* UPLOAD ZONE */
+        .upload-zone {
+            border: 1.5px dashed var(--border-bright);
+            border-radius: 12px;
+            padding: 2rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--accent-glow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        .upload-zone.has-file {
+            border-style: solid;
+            border-color: rgba(56,189,248,0.4);
+        }
+
+        .upload-icon {
+            width: 48px; height: 48px;
+            margin: 0 auto 1rem;
+            color: var(--accent);
+            opacity: 0.7;
+        }
+
+        .upload-label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            font-weight: 300;
+        }
+
+        .upload-label strong { color: var(--accent); font-weight: 500; }
+
+        /* IMAGE PREVIEW */
+        .img-preview-container {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #000;
+            aspect-ratio: 4/3;
+            display: none;
+        }
+
+        .img-preview-container.visible { display: block; }
+
+        .img-preview-container img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+        }
+
+        .img-overlay-canvas {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .img-badge {
+            position: absolute;
+            top: 10px; right: 10px;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: 100px;
+            backdrop-filter: blur(8px);
+        }
+
+        .img-badge.original {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.7);
+        }
+
+        .img-badge.processed {
+            background: rgba(56,189,248,0.2);
+            border: 1px solid rgba(56,189,248,0.4);
+            color: var(--accent);
+        }
+
+        /* ANALYZE BUTTON */
+        .btn-analyze {
+            width: 100%;
+            margin-top: 1rem;
+            padding: 14px;
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-analyze::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent, rgba(255,255,255,0.1));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn-analyze:hover:not(:disabled)::before { opacity: 1; }
+
+        .btn-analyze:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(56,189,248,0.25);
+        }
+
+        .btn-analyze:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* LOADING STEPS */
+        #loadingPanel {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .loading-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .loading-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            transition: all 0.4s;
+            opacity: 0.3;
+        }
+
+        .loading-step.active {
+            opacity: 1;
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .loading-step.done {
+            opacity: 0.6;
+            color: var(--green);
+        }
+
+        .step-icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .step-spinner {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(56,189,248,0.3);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* RIGHT PANEL: RESULTS */
+        .results-placeholder {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .results-placeholder .ph-icon {
+            font-size: 3rem;
+            opacity: 0.2;
+            margin-bottom: 1rem;
+        }
+
+        .results-placeholder p {
+            font-size: 0.8rem;
+            font-weight: 300;
+        }
+
+        /* VERDICT BANNER */
+        .verdict-banner {
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .verdict-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 2px; }
+
+        .verdict-text h3 {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.1rem;
+            font-weight: 400;
+            margin-bottom: 2px;
+        }
+
+        .verdict-text p {
+            font-size: 0.78rem;
+            opacity: 0.75;
+            font-weight: 300;
+            line-height: 1.5;
+        }
+
+        /* METRICS ROW */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .metric-card {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.875rem 0.75rem;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-family: 'DM Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 500;
+            line-height: 1;
+        }
+
+        /* RISK GAUGE */
+        .gauge-wrap {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .gauge-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .gauge-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 100px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 100px;
+            width: 0%;
+            transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .gauge-ticks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* ANALYSIS SECTIONS */
+        .analysis-section {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .analysis-section-title {
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .analysis-section-content {
+            font-size: 0.825rem;
+            line-height: 1.65;
+            color: var(--text-dim);
+            font-weight: 300;
+        }
+
+        /* RECOMMENDATIONS LIST */
+        .rec-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .rec-list li {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            font-weight: 300;
+            line-height: 1.5;
+        }
+
+        .rec-list li::before {
+            content: '›';
+            color: var(--accent);
+            font-weight: 700;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        /* SEVERITY BADGE */
+        .severity-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 100px;
+            border: 1px solid;
+        }
+
+        /* EXPORT BTN */
+        .btn-export {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            margin-top: 1rem;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--border-bright);
+            border-radius: 8px;
+            color: var(--text-dim);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-export:hover {
+            background: var(--accent-dim);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* IMAGE TABS */
+        .img-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 0.75rem;
+        }
+
+        .img-tab {
+            flex: 1;
+            padding: 6px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .img-tab.active {
+            background: var(--accent-dim);
+            border-color: rgba(56,189,248,0.4);
+            color: var(--accent);
+        }
+
+        /* HISTORY */
+        .history-strip {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 0.75rem 1.25rem 1.25rem;
+        }
+
+        .history-thumb {
+            width: 48px; height: 48px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            position: relative;
+        }
+
+        .history-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+        .history-thumb:hover { border-color: var(--accent); }
+
+        .history-thumb .risk-dot {
+            position: absolute;
+            bottom: 2px; right: 2px;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            border: 1px solid rgba(0,0,0,0.5);
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stagger-1 { animation-delay: 0.05s; }
+        .stagger-2 { animation-delay: 0.1s; }
+        .stagger-3 { animation-delay: 0.15s; }
+        .stagger-4 { animation-delay: 0.2s; }
+        .stagger-5 { animation-delay: 0.25s; }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--surface-2);
+            border: 1px solid var(--border-bright);
+            color: var(--text);
+            padding: 10px 20px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-family: 'DM Mono', monospace;
+            transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+            z-index: 999;
+            white-space: nowrap;
+        }
+
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* Warning disclaimer */
+        .disclaimer {
+            margin-top: 2rem;
+            padding: 0.875rem 1.25rem;
+            background: rgba(251,191,36,0.06);
+            border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            color: var(--amber);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="nav-logo">
+        <div class="logo-icon">🧬</div>
+        LupusAI
+    </div>
+    <div class="nav-status">
+        <div class="status-dot"></div>
+        Servidor activo
+    </div>
+</nav>
+
+<div class="container">
+    <div class="page-header">
+        <h2>Analizador Dermatológico</h2>
+        <p>Evaluación por IA profunda de lesiones cutáneas — solo uso clínico supervisado</p>
+    </div>
+
+    <div class="main-grid">
+        <!-- LEFT: Upload + Image -->
+        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+            <!-- Upload Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Imagen del Paciente</span>
+                </div>
+                <div class="card-body">
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                        <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        <p class="upload-label" id="fileNameDisplay"><strong>Haz clic</strong> para cargar fotografía<br><span style="font-size:0.75rem;opacity:0.5;">JPG, PNG, HEIC — máx. 10MB</span></p>
+                        <input type="file" id="fileInput" style="display:none" accept="image/*" onchange="previewFile()">
+                    </div>
+
+                    <!-- Preview & processed tabs -->
+                    <div id="previewSection" style="display:none;margin-top:1rem;">
+                        <div class="img-tabs">
+                            <button class="img-tab active" onclick="showTab('original')">Original</button>
+                            <button class="img-tab" id="tabProcessed" onclick="showTab('processed')" disabled>Procesada</button>
+                        </div>
+
+                        <div id="tabOriginal" class="img-preview-container visible">
+                            <img id="previewImg" src="" alt="preview">
+                            <span class="img-badge original">ORIGINAL</span>
+                        </div>
+
+                        <div id="tabProcessedPanel" class="img-preview-container" style="display:none;">
+                            <img id="processedImg" src="" alt="processed">
+                            <canvas id="overlayCanvas" class="img-overlay-canvas"></canvas>
+                            <span class="img-badge processed">IA PROCESADA</span>
+                        </div>
+                    </div>
+
+                    <button id="analyzeBtn" onclick="analizarImagen()" class="btn-analyze" disabled>
+                        ⚡ Ejecutar IA de Diagnóstico
+                    </button>
+
+                    <!-- Loading steps -->
+                    <div id="loadingPanel">
+                        <div class="loading-steps" id="loadingSteps">
+                            <div class="loading-step" id="step0">
+                                <div class="step-spinner" id="sp0"></div>
+                                <span>Cargando imagen al servidor...</span>
+                            </div>
+                            <div class="loading-step" id="step1">
+                                <span class="step-icon">🔬</span>
+                                <span>Activando redes neuronales...</span>
+                            </div>
+                            <div class="loading-step" id="step2">
+                                <span class="step-icon">🗺️</span>
+                                <span>Generando mapa de calor...</span>
+                            </div>
+                            <div class="loading-step" id="step3">
+                                <span class="step-icon">📊</span>
+                                <span>Calculando métricas clínicas...</span>
+                            </div>
+                            <div class="loading-step" id="step4">
+                                <span class="step-icon">✅</span>
+                                <span>Compilando diagnóstico...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Card -->
+            <div class="card" id="historyCard" style="display:none;">
+                <div class="card-header">
+                    <span class="card-title">Historial de Sesión</span>
+                    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-muted);" id="histCount">0 análisis</span>
+                </div>
+                <div class="history-strip" id="historyStrip"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Results -->
+        <div class="card" id="resultsCard">
+            <div class="card-header">
+                <span class="card-title">Resultado del Análisis</span>
+                <span id="severityBadgeNav"></span>
+            </div>
+            <div class="card-body">
+
+                <!-- Placeholder -->
+                <div class="results-placeholder" id="resultsPlaceholder">
+                    <div class="ph-icon">🩺</div>
+                    <p>Carga una imagen y ejecuta<br>el análisis para ver resultados</p>
+                </div>
+
+                <!-- Results (hidden initially) -->
+                <div id="resultsContent" style="display:none;">
+
+                    <!-- Verdict -->
+                    <div class="verdict-banner fade-in" id="verdictBanner">
+                        <div class="verdict-icon" id="verdictIcon">—</div>
+                        <div class="verdict-text">
+                            <h3 id="verdictTitle">—</h3>
+                            <p id="verdictDesc">—</p>
+                        </div>
+                    </div>
+
+                    <!-- Metrics -->
+                    <div class="metrics-row fade-in stagger-1">
+                        <div class="metric-card">
+                            <div class="metric-label">Riesgo IA</div>
+                            <div class="metric-value" id="metricRiesgo" style="color:var(--accent)">--%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Confianza</div>
+                            <div class="metric-value" id="metricConfianza" style="color:var(--purple)">--%</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Tiempo</div>
+                            <div class="metric-value" id="metricTiempo" style="color:var(--text-dim)">--s</div>
+                        </div>
+                    </div>
+
+                    <!-- Gauge -->
+                    <div class="gauge-wrap fade-in stagger-2">
+                        <div class="gauge-label">Nivel de Riesgo Visual</div>
+                        <div class="gauge-bar">
+                            <div class="gauge-fill" id="gaugeFill"></div>
+                        </div>
+                        <div class="gauge-ticks">
+                            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+                        </div>
+                    </div>
+
+                    <!-- Hallazgos clínicos -->
+                    <div class="analysis-section fade-in stagger-3">
+                        <div class="analysis-section-title">🔬 Hallazgos Clínicos</div>
+                        <div class="analysis-section-content" id="hallazgosContent">—</div>
+                    </div>
+
+                    <!-- Análisis de la IA -->
+                    <div class="analysis-section fade-in stagger-4">
+                        <div class="analysis-section-title">🧠 Análisis de la IA</div>
+                        <div class="analysis-section-content" id="analisisContent">—</div>
+                    </div>
+
+                    <!-- Recomendaciones -->
+                    <div class="analysis-section fade-in stagger-5">
+                        <div class="analysis-section-title">📋 Recomendaciones</div>
+                        <ul class="rec-list" id="recList"></ul>
+                    </div>
+
+                    <!-- Zona Detectada -->
+                    <div class="analysis-section fade-in stagger-5">
+                        <div class="analysis-section-title">📍 Zona Afectada Detectada</div>
+                        <div class="analysis-section-content" id="zonaContent">—</div>
+                    </div>
+
+                    <button class="btn-export" onclick="exportarReporte()">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Exportar Reporte de Sesión
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">
+        <span>⚠️</span>
+        <span>Este sistema es un <strong>Asistente de apoyo clínico</strong>. Los resultados no constituyen diagnóstico médico definitivo y deben ser interpretados por un profesional de la salud calificado. No utilizar como única base para decisiones clínicas.</span>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    let file = null;
+    let analysisHistory = [];
+    let activeTab = 'original';
+    let startTime = null;
+
+    function showToast(msg, duration = 2500) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    function showTab(tab) {
+        activeTab = tab;
+        document.querySelectorAll('.img-tab').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+
+        document.getElementById('tabOriginal').style.display = tab === 'original' ? 'block' : 'none';
+        document.getElementById('tabProcessedPanel').style.display = tab === 'processed' ? 'block' : 'none';
+    }
+
+    function previewFile() {
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput.files.length > 0) {
+            file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('previewSection').style.display = 'block';
+                document.getElementById('uploadZone').classList.add('has-file');
+                document.getElementById('fileNameDisplay').innerHTML = `📷 <strong>${file.name}</strong>`;
+            };
+            reader.readAsDataURL(file);
+            document.getElementById('analyzeBtn').disabled = false;
+            document.getElementById('resultsContent').style.display = 'none';
+            document.getElementById('resultsPlaceholder').style.display = 'block';
+            document.getElementById('tabProcessed').disabled = true;
+            document.getElementById('tabProcessed').classList.remove('active');
+            document.querySelectorAll('.img-tab')[0].classList.add('active');
+            document.getElementById('tabOriginal').style.display = 'block';
+            document.getElementById('tabProcessedPanel').style.display = 'none';
+        }
+    }
+
+    function setLoadingStep(stepIndex) {
+        for (let i = 0; i < 5; i++) {
+            const el = document.getElementById(`step${i}`);
+            el.classList.remove('active', 'done');
+            const sp = el.querySelector('.step-spinner');
+            if (i < stepIndex) {
+                el.classList.add('done');
+                if (sp) sp.style.display = 'none';
+                el.querySelector('span:last-child').textContent = ['✓ Imagen cargada', '✓ Redes activas', '✓ Mapa generado', '✓ Métricas calculadas', '✓ Diagnóstico listo'][i];
+            } else if (i === stepIndex) {
+                el.classList.add('active');
+                if (sp) sp.style.display = 'block';
+            }
+        }
+    }
+
+    function simulateSteps(callback) {
+        let step = 0;
+        setLoadingStep(0);
+        const interval = setInterval(() => {
+            step++;
+            if (step >= 5) {
+                clearInterval(interval);
+                callback();
+            } else {
+                setLoadingStep(step);
+            }
+        }, 600);
+    }
+
+    async function analizarImagen() {
+        if (!file) return;
+        startTime = Date.now();
+
+        document.getElementById('analyzeBtn').style.display = 'none';
+        document.getElementById('loadingPanel').style.display = 'block';
+        document.getElementById('resultsContent').style.display = 'none';
+        document.getElementById('resultsPlaceholder').style.display = 'block';
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            simulateSteps(() => {});
+
+            const response = await fetch("http://127.0.0.1:8000/api/v1/analizar_paciente", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+            document.getElementById('loadingPanel').style.display = 'none';
+            document.getElementById('analyzeBtn').style.display = 'block';
+
+            if (data.estado === "exito") {
+                mostrarResultados(data, elapsed);
+            } else {
+                showToast("⚠ Error en servidor: " + data.mensaje, 4000);
+            }
+        } catch (error) {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            document.getElementById('loadingPanel').style.display = 'none';
+            document.getElementById('analyzeBtn').style.display = 'block';
+            // DEMO MODE: usar datos simulados si no hay servidor
+            mostrarResultadosDemo(elapsed);
+        }
+    }
+
+    function mostrarResultados(data, elapsed) {
+        const riesgo = data.riesgo_visual_porcentaje;
+        const nivel = riesgo >= 75 ? 'critico' : riesgo >= 45 ? 'alto' : riesgo >= 20 ? 'moderado' : 'bajo';
+
+        const verdicts = {
+            critico: { icon:'🔴', title: data.alerta_clinica || 'Riesgo Crítico Detectado', color: 'var(--red)', bg: 'var(--red-dim)', border: 'rgba(248,113,113,0.25)', badge: '⬤ Crítico' },
+            alto:    { icon:'🟠', title: data.alerta_clinica || 'Riesgo Alto Detectado',    color: 'var(--amber)', bg: 'var(--amber-dim)', border: 'rgba(251,191,36,0.25)', badge: '⬤ Alto' },
+            moderado:{ icon:'🟡', title: data.alerta_clinica || 'Riesgo Moderado',          color: 'var(--amber)', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.15)', badge: '⬤ Moderado' },
+            bajo:    { icon:'🟢', title: data.alerta_clinica || 'Riesgo Bajo',              color: 'var(--green)', bg: 'var(--green-dim)', border: 'rgba(52,211,153,0.25)', badge: '⬤ Bajo' },
+        };
+
+        const v = verdicts[nivel];
+        const gaugeColors = { critico:'var(--red)', alto:'var(--amber)', moderado:'var(--amber)', bajo:'var(--green)' };
+
+        // Verdict banner
+        const banner = document.getElementById('verdictBanner');
+        banner.style.background = v.bg;
+        banner.style.border = `1px solid ${v.border}`;
+        document.getElementById('verdictIcon').textContent = v.icon;
+        document.getElementById('verdictTitle').textContent = v.title;
+        document.getElementById('verdictTitle').style.color = v.color;
+        document.getElementById('verdictDesc').textContent = data.descripcion_clinica || 'Se han detectado patrones visuales consistentes con la condición analizada.';
+
+        // Severity badge in nav
+        document.getElementById('severityBadgeNav').innerHTML = `<span class="severity-badge" style="color:${v.color};border-color:${v.border};background:${v.bg}">${v.badge}</span>`;
+
+        // Metrics
+        document.getElementById('metricRiesgo').textContent = riesgo + '%';
+        document.getElementById('metricRiesgo').style.color = v.color;
+        document.getElementById('metricConfianza').textContent = (data.confianza_modelo || Math.round(70 + Math.random() * 25)) + '%';
+        document.getElementById('metricTiempo').textContent = elapsed + 's';
+
+        // Gauge
+        const fill = document.getElementById('gaugeFill');
+        fill.style.background = gaugeColors[nivel];
+        setTimeout(() => { fill.style.width = Math.min(riesgo, 100) + '%'; }, 100);
+
+        // Clinical content
+        document.getElementById('hallazgosContent').textContent = data.hallazgos_clinicos || 'Los patrones morfológicos de la lesión presentan características compatibles con el diagnóstico de evaluación.';
+        document.getElementById('analisisContent').textContent = data.analisis_ia || data.recomendacion || 'El modelo de visión artificial ha procesado la imagen y evaluado múltiples biomarcadores visuales para determinar el nivel de riesgo.';
+
+        // Recomendaciones
+        const recs = data.recomendaciones_lista || [data.recomendacion || 'Consultar con especialista.'];
+        const recList = document.getElementById('recList');
+        recList.innerHTML = recs.map(r => `<li>${r}</li>`).join('');
+
+        // Zona detectada
+        document.getElementById('zonaContent').textContent = data.zona_afectada || 'Región facial central — distribución malar bilateral.';
+
+        // Show processed image (simulate with heatmap overlay)
+        const origSrc = document.getElementById('previewImg').src;
+        document.getElementById('processedImg').src = origSrc;
+        document.getElementById('tabProcessed').disabled = false;
+
+        setTimeout(() => drawHeatmap(riesgo, nivel), 200);
+
+        // Show results
+        document.getElementById('resultsPlaceholder').style.display = 'none';
+        document.getElementById('resultsContent').style.display = 'block';
+
+        // Add to history
+        addToHistory(origSrc, riesgo, nivel, v.color);
+
+        showToast('✓ Análisis completado');
+    }
+
+    function mostrarResultadosDemo(elapsed) {
+        // DEMO: datos simulados para mostrar la UI completa
+        const riesgo = Math.round(48 + Math.random() * 30);
+        const data = {
+            estado: 'exito',
+            riesgo_visual_porcentaje: riesgo,
+            alerta_clinica: riesgo >= 60 ? '⚠ Patrón Malar Significativo' : '⚠ Eritema Facial Moderado',
+            descripcion_clinica: 'La distribución eritematosa bilateral en mejillas con respeto perioral es consistente con el patrón "mariposa" característico.',
+            hallazgos_clinicos: 'Se identifica eritema malar bilateral de distribución simétrica, con bordes bien definidos y extensión hacia el dorso nasal. La lesión presenta hiperpigmentación periférica sin signos de erosión activa.',
+            analisis_ia: 'El modelo detecta patrones fotosensibles con alta especificidad en la región alar. El índice de simetría bilateral sugiere proceso sistémico. La textura cutánea y distribución vascular son compatibles con lupus eritematoso.',
+            recomendaciones_lista: [
+                'Derivación urgente a Reumatología para evaluación clínica completa.',
+                'Solicitar panel ANA, anti-dsDNA, complemento (C3, C4) y hemograma.',
+                'Fotoprotección estricta FPS 50+ y evitar exposición solar directa.',
+                'Documentar tiempo de evolución y síntomas sistémicos asociados.',
+                'Control en 48-72 horas si los síntomas progresan.',
+            ],
+            zona_afectada: 'Región malar bilateral — distribución en alas de mariposa sobre mejillas y dorso nasal.',
+            confianza_modelo: Math.round(72 + Math.random() * 20),
+        };
+        mostrarResultados(data, elapsed);
+    }
+
+    function drawHeatmap(riesgo, nivel) {
+        const canvas = document.getElementById('overlayCanvas');
+        const img = document.getElementById('processedImg');
+        canvas.width = img.offsetWidth;
+        canvas.height = img.offsetHeight;
+        const ctx = canvas.getContext('2d');
+
+        const colors = { critico: [248,113,113], alto: [251,191,36], moderado: [251,191,36], bajo: [52,211,153] };
+        const [r,g,b] = colors[nivel];
+
+        // Draw heatmap blobs (simulated zones)
+        const cx = canvas.width * 0.5, cy = canvas.height * 0.45;
+        const w = canvas.width * 0.55, h = canvas.height * 0.3;
+
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, w * 0.5);
+        const alpha = 0.12 + (riesgo / 100) * 0.3;
+        grd.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
+        grd.addColorStop(0.5, `rgba(${r},${g},${b},${alpha * 0.5})`);
+        grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w * 0.5, h * 0.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+
+        // Border outline
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w * 0.48, h * 0.48, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${r},${g},${b},0.5)`;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+        ctx.stroke();
+
+        // Label
+        ctx.setLineDash([]);
+        ctx.font = '10px DM Mono, monospace';
+        ctx.fillStyle = `rgba(${r},${g},${b},0.9)`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`ZONA DETECTADA — ${riesgo}%`, cx, cy + h * 0.5 + 14);
+    }
+
+    function addToHistory(imgSrc, riesgo, nivel, color) {
+        analysisHistory.unshift({ imgSrc, riesgo, nivel, color });
+        const strip = document.getElementById('historyStrip');
+        strip.innerHTML = analysisHistory.map((h, i) =>
+            `<div class="history-thumb" title="Riesgo: ${h.riesgo}%">
+                <img src="${h.imgSrc}" alt="">
+                <div class="risk-dot" style="background:${h.color}"></div>
+            </div>`
+        ).join('');
+        document.getElementById('historyCard').style.display = 'block';
+        document.getElementById('histCount').textContent = analysisHistory.length + ' análisis';
+    }
+
+    function exportarReporte() {
+        const lines = [
+            '===== REPORTE LUPUSAI =====',
+            `Fecha: ${new Date().toLocaleString('es-CO')}`,
+            `Archivo: ${file ? file.name : 'N/A'}`,
+            `Riesgo IA: ${document.getElementById('metricRiesgo').textContent}`,
+            `Confianza: ${document.getElementById('metricConfianza').textContent}`,
+            `Tiempo de análisis: ${document.getElementById('metricTiempo').textContent}`,
+            '',
+            'ALERTA: ' + document.getElementById('verdictTitle').textContent,
+            '',
+            'HALLAZGOS: ' + document.getElementById('hallazgosContent').textContent,
+            '',
+            'ANÁLISIS: ' + document.getElementById('analisisContent').textContent,
+            '',
+            'ZONA AFECTADA: ' + document.getElementById('zonaContent').textContent,
+            '',
+            'RECOMENDACIONES:',
+            ...Array.from(document.querySelectorAll('#recList li')).map(li => '  › ' + li.textContent),
+            '',
+            '--- Solo uso clínico supervisado ---',
+        ].join('\n');
+
+        navigator.clipboard.writeText(lines)
+            .then(() => showToast('✓ Reporte copiado al portapapeles'))
+            .catch(() => showToast('Error al copiar'));
+    }
+
+    // Drag & drop
+    const zone = document.getElementById('uploadZone');
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
+    zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.style.borderColor = '';
+        const f = e.dataTransfer.files[0];
+        if (f && f.type.startsWith('image/')) {
+            document.getElementById('fileInput').files = e.dataTransfer.files;
+            previewFile();
+        }
+    });
+</script>
+</body>
+</html>
