@@ -42,6 +42,6 @@ El proyecto cuenta con un entorno aislado para fácil reproducción en cualquier
 
 **1. Clonar el repositorio y crear entorno:**
 ```bash
-git clone [https://github.com/tu-usuario/LupusAI.git](https://github.com/tu-usuario/LupusAI.git)
+git clone [https://github.com/ferchoobarba/Lupus_IA_Proyect/tree/main](https://github.com/ferchoobarba/Lupus_IA_Proyect/tree/main)
 cd LupusAI/backend
 python -m venv venv
